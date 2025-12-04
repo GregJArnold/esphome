@@ -3,12 +3,10 @@
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/time.h"
+#include "esphome/components/display/display.h"
 
 #include <vector>
-
-#ifdef USE_TIME
-#include "esphome/components/time/real_time_clock.h"
-#endif
 
 #ifdef USE_BINARY_SENSOR
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -22,7 +20,7 @@ class TM1637Display;
 class TM1637Key;
 #endif
 
-using tm1637_writer_t = std::function<void(TM1637Display &)>;
+using tm1637_writer_t = display::DisplayWriter<TM1637Display>;
 
 class TM1637Display : public PollingComponent {
  public:
@@ -52,6 +50,7 @@ class TM1637Display : public PollingComponent {
   void set_intensity(uint8_t intensity) { this->intensity_ = intensity; }
   void set_inverted(bool inverted) { this->inverted_ = inverted; }
   void set_length(uint8_t length) { this->length_ = length; }
+  void set_on(bool on) { this->on_ = on; }
 
   void display();
 
@@ -61,12 +60,10 @@ class TM1637Display : public PollingComponent {
   void add_tm1637_key(TM1637Key *tm1637_key) { this->tm1637_keys_.push_back(tm1637_key); }
 #endif
 
-#ifdef USE_TIME
   /// Evaluate the strftime-format and print the result at the given position.
-  uint8_t strftime(uint8_t pos, const char *format, time::ESPTime time) __attribute__((format(strftime, 3, 0)));
+  uint8_t strftime(uint8_t pos, const char *format, ESPTime time) __attribute__((format(strftime, 3, 0)));
   /// Evaluate the strftime-format and print the result at position 0.
-  uint8_t strftime(const char *format, time::ESPTime time) __attribute__((format(strftime, 2, 0)));
-#endif
+  uint8_t strftime(const char *format, ESPTime time) __attribute__((format(strftime, 2, 0)));
 
  protected:
   void bit_delay_();
@@ -81,7 +78,8 @@ class TM1637Display : public PollingComponent {
   uint8_t intensity_;
   uint8_t length_;
   bool inverted_;
-  optional<tm1637_writer_t> writer_{};
+  bool on_{true};
+  tm1637_writer_t writer_{};
   uint8_t buffer_[6] = {0};
 #ifdef USE_BINARY_SENSOR
   std::vector<TM1637Key *> tm1637_keys_{};

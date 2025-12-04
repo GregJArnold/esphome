@@ -1,11 +1,14 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import sensor
+import esphome.config_validation as cv
 from esphome.const import (
-    STATE_CLASS_MEASUREMENT,
-    UNIT_CELSIUS,
     DEVICE_CLASS_TEMPERATURE,
     ENTITY_CATEGORY_DIAGNOSTIC,
+    PLATFORM_BK72XX,
+    PLATFORM_ESP32,
+    PLATFORM_RP2040,
+    STATE_CLASS_MEASUREMENT,
+    UNIT_CELSIUS,
 )
 
 internal_temperature_ns = cg.esphome_ns.namespace("internal_temperature")
@@ -22,7 +25,7 @@ CONFIG_SCHEMA = cv.All(
         state_class=STATE_CLASS_MEASUREMENT,
         entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
     ).extend(cv.polling_component_schema("60s")),
-    cv.only_on(["esp32", "rp2040"]),
+    cv.only_on([PLATFORM_ESP32, PLATFORM_RP2040, PLATFORM_BK72XX]),
 )
 
 

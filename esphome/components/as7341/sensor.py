@@ -1,14 +1,14 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import i2c, sensor
+import esphome.config_validation as cv
 from esphome.const import (
+    CONF_CLEAR,
     CONF_GAIN,
     CONF_ID,
     DEVICE_CLASS_ILLUMINANCE,
     ICON_BRIGHTNESS_5,
     STATE_CLASS_MEASUREMENT,
 )
-
 
 CODEOWNERS = ["@mrgnr"]
 DEPENDENCIES = ["i2c"]
@@ -30,7 +30,6 @@ CONF_F5 = "f5"
 CONF_F6 = "f6"
 CONF_F7 = "f7"
 CONF_F8 = "f8"
-CONF_CLEAR = "clear"
 CONF_NIR = "nir"
 
 UNIT_COUNTS = "#"
@@ -107,6 +106,6 @@ async def to_code(config):
     cg.add(var.set_astep(config[CONF_ASTEP]))
 
     for conf_id, set_sensor_func in SENSORS.items():
-        if conf_id in config:
-            sens = await sensor.new_sensor(config[conf_id])
+        if sens_config := config.get(conf_id):
+            sens = await sensor.new_sensor(sens_config)
             cg.add(getattr(var, set_sensor_func)(sens))

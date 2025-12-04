@@ -7,140 +7,129 @@
 #ifdef USE_SENSOR
 #include "esphome/components/sensor/sensor.h"
 #endif
+#ifdef USE_NUMBER
+#include "esphome/components/number/number.h"
+#endif
+#ifdef USE_SWITCH
+#include "esphome/components/switch/switch.h"
+#endif
+#ifdef USE_BUTTON
+#include "esphome/components/button/button.h"
+#endif
+#ifdef USE_SELECT
+#include "esphome/components/select/select.h"
+#endif
+#ifdef USE_TEXT_SENSOR
+#include "esphome/components/text_sensor/text_sensor.h"
+#endif
+#include "esphome/components/ld24xx/ld24xx.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/automation.h"
 #include "esphome/core/helpers.h"
 
-namespace esphome {
-namespace ld2410 {
+#include <array>
 
-#define CHECK_BIT(var, pos) (((var) >> (pos)) & 1)
+namespace esphome::ld2410 {
 
-// Commands
-static const uint8_t CMD_ENABLE_CONF = 0x00FF;
-static const uint8_t CMD_DISABLE_CONF = 0x00FE;
-static const uint8_t CMD_MAXDIST_DURATION = 0x0060;
-static const uint8_t CMD_QUERY = 0x0061;
-static const uint8_t CMD_GATE_SENS = 0x0064;
-static const uint8_t CMD_VERSION = 0x00A0;
+using namespace ld24xx;
 
-// Commands values
-static const uint8_t CMD_MAX_MOVE_VALUE = 0x0000;
-static const uint8_t CMD_MAX_STILL_VALUE = 0x0001;
-static const uint8_t CMD_DURATION_VALUE = 0x0002;
-// Command Header & Footer
-static const uint8_t CMD_FRAME_HEADER[4] = {0xFD, 0xFC, 0xFB, 0xFA};
-static const uint8_t CMD_FRAME_END[4] = {0x04, 0x03, 0x02, 0x01};
-// Data Header & Footer
-static const uint8_t DATA_FRAME_HEADER[4] = {0xF4, 0xF3, 0xF2, 0xF1};
-static const uint8_t DATA_FRAME_END[4] = {0xF8, 0xF7, 0xF6, 0xF5};
-/*
-Data Type: 6th byte
-Target states: 9th byte
-    Moving target distance: 10~11th bytes
-    Moving target energy: 12th byte
-    Still target distance: 13~14th bytes
-    Still target energy: 15th byte
-    Detect distance: 16~17th bytes
-*/
-enum PeriodicDataStructure : uint8_t {
-  DATA_TYPES = 5,
-  TARGET_STATES = 8,
-  MOVING_TARGET_LOW = 9,
-  MOVING_TARGET_HIGH = 10,
-  MOVING_ENERGY = 11,
-  STILL_TARGET_LOW = 12,
-  STILL_TARGET_HIGH = 13,
-  STILL_ENERGY = 14,
-  DETECT_DISTANCE_LOW = 15,
-  DETECT_DISTANCE_HIGH = 16,
-};
-enum PeriodicDataValue : uint8_t { HEAD = 0XAA, END = 0x55, CHECK = 0x00 };
+static constexpr uint8_t MAX_LINE_LENGTH = 46;  // Max characters for serial buffer
+static constexpr uint8_t TOTAL_GATES = 9;       // Total number of gates supported by the LD2410
 
-enum AckDataStructure : uint8_t { COMMAND = 6, COMMAND_STATUS = 7 };
-
-//  char cmd[2] = {enable ? 0xFF : 0xFE, 0x00};
 class LD2410Component : public Component, public uart::UARTDevice {
+#ifdef USE_BINARY_SENSOR
+  SUB_BINARY_SENSOR(out_pin_presence_status)
+  SUB_BINARY_SENSOR(moving_target)
+  SUB_BINARY_SENSOR(still_target)
+  SUB_BINARY_SENSOR(target)
+#endif
 #ifdef USE_SENSOR
-  SUB_SENSOR(moving_target_distance)
-  SUB_SENSOR(still_target_distance)
-  SUB_SENSOR(moving_target_energy)
-  SUB_SENSOR(still_target_energy)
-  SUB_SENSOR(detection_distance)
+  SUB_SENSOR_WITH_DEDUP(light, uint8_t)
+  SUB_SENSOR_WITH_DEDUP(detection_distance, int)
+  SUB_SENSOR_WITH_DEDUP(moving_target_distance, int)
+  SUB_SENSOR_WITH_DEDUP(moving_target_energy, uint8_t)
+  SUB_SENSOR_WITH_DEDUP(still_target_distance, int)
+  SUB_SENSOR_WITH_DEDUP(still_target_energy, uint8_t)
+#endif
+#ifdef USE_TEXT_SENSOR
+  SUB_TEXT_SENSOR(version)
+  SUB_TEXT_SENSOR(mac)
+#endif
+#ifdef USE_NUMBER
+  SUB_NUMBER(light_threshold)
+  SUB_NUMBER(max_move_distance_gate)
+  SUB_NUMBER(max_still_distance_gate)
+  SUB_NUMBER(timeout)
+#endif
+#ifdef USE_SELECT
+  SUB_SELECT(baud_rate)
+  SUB_SELECT(distance_resolution)
+  SUB_SELECT(light_function)
+  SUB_SELECT(out_pin_level)
+#endif
+#ifdef USE_SWITCH
+  SUB_SWITCH(bluetooth)
+  SUB_SWITCH(engineering_mode)
+#endif
+#ifdef USE_BUTTON
+  SUB_BUTTON(factory_reset)
+  SUB_BUTTON(query)
+  SUB_BUTTON(restart)
 #endif
 
  public:
   void setup() override;
   void dump_config() override;
   void loop() override;
-
-#ifdef USE_BINARY_SENSOR
-  void set_target_sensor(binary_sensor::BinarySensor *sens) { this->target_binary_sensor_ = sens; };
-  void set_moving_target_sensor(binary_sensor::BinarySensor *sens) { this->moving_binary_sensor_ = sens; };
-  void set_still_target_sensor(binary_sensor::BinarySensor *sens) { this->still_binary_sensor_ = sens; };
+  void set_light_out_control();
+#ifdef USE_NUMBER
+  void set_gate_still_threshold_number(uint8_t gate, number::Number *n);
+  void set_gate_move_threshold_number(uint8_t gate, number::Number *n);
+  void set_max_distances_timeout();
+  void set_gate_threshold(uint8_t gate);
 #endif
-
-  void set_timeout(uint16_t value) { this->timeout_ = value; };
-  void set_max_move_distance(uint8_t value) { this->max_move_distance_ = value; };
-  void set_max_still_distance(uint8_t value) { this->max_still_distance_ = value; };
-  void set_range_config(int rg0_move, int rg0_still, int rg1_move, int rg1_still, int rg2_move, int rg2_still,
-                        int rg3_move, int rg3_still, int rg4_move, int rg4_still, int rg5_move, int rg5_still,
-                        int rg6_move, int rg6_still, int rg7_move, int rg7_still, int rg8_move, int rg8_still) {
-    this->rg0_move_threshold_ = rg0_move;
-    this->rg0_still_threshold_ = rg0_still;
-    this->rg1_move_threshold_ = rg1_move;
-    this->rg1_still_threshold_ = rg1_still;
-    this->rg2_move_threshold_ = rg2_move;
-    this->rg2_still_threshold_ = rg2_still;
-    this->rg3_move_threshold_ = rg3_move;
-    this->rg3_still_threshold_ = rg3_still;
-    this->rg4_move_threshold_ = rg4_move;
-    this->rg4_still_threshold_ = rg4_still;
-    this->rg5_move_threshold_ = rg5_move;
-    this->rg5_still_threshold_ = rg5_still;
-    this->rg6_move_threshold_ = rg6_move;
-    this->rg6_still_threshold_ = rg6_still;
-    this->rg7_move_threshold_ = rg7_move;
-    this->rg7_still_threshold_ = rg7_still;
-    this->rg8_move_threshold_ = rg8_move;
-    this->rg8_still_threshold_ = rg8_still;
-  };
-  int moving_sensitivities[9] = {0};
-  int still_sensitivities[9] = {0};
-
-  int32_t last_periodic_millis = millis();
+#ifdef USE_SENSOR
+  void set_gate_move_sensor(uint8_t gate, sensor::Sensor *s);
+  void set_gate_still_sensor(uint8_t gate, sensor::Sensor *s);
+#endif
+  void set_bluetooth_password(const std::string &password);
+  void set_engineering_mode(bool enable);
+  void read_all_info();
+  void restart_and_read_all_info();
+  void set_bluetooth(bool enable);
+  void set_distance_resolution(const char *state);
+  void set_baud_rate(const char *state);
+  void factory_reset();
 
  protected:
-#ifdef USE_BINARY_SENSOR
-  binary_sensor::BinarySensor *target_binary_sensor_{nullptr};
-  binary_sensor::BinarySensor *moving_binary_sensor_{nullptr};
-  binary_sensor::BinarySensor *still_binary_sensor_{nullptr};
-#endif
-
-  std::vector<uint8_t> rx_buffer_;
-  int two_byte_to_int_(char firstbyte, char secondbyte) { return (int16_t) (secondbyte << 8) + firstbyte; }
-  void send_command_(uint8_t command_str, uint8_t *command_value, int command_value_len);
-
-  void set_max_distances_timeout_(uint8_t max_moving_distance_range, uint8_t max_still_distance_range,
-                                  uint16_t timeout);
-  void set_gate_threshold_(uint8_t gate, uint8_t motionsens, uint8_t stillsens);
+  void send_command_(uint8_t command_str, const uint8_t *command_value, uint8_t command_value_len);
   void set_config_mode_(bool enable);
-  void handle_periodic_data_(uint8_t *buffer, int len);
-  void handle_ack_data_(uint8_t *buffer, int len);
-  void readline_(int readch, uint8_t *buffer, int len);
+  void handle_periodic_data_();
+  bool handle_ack_data_();
+  void readline_(int readch);
   void query_parameters_();
   void get_version_();
+  void get_mac_();
+  void get_distance_resolution_();
+  void query_light_control_();
+  void restart_();
 
-  uint16_t timeout_;
-  uint8_t max_move_distance_;
-  uint8_t max_still_distance_;
-
-  uint8_t version_[6];
-  uint8_t rg0_move_threshold_, rg0_still_threshold_, rg1_move_threshold_, rg1_still_threshold_, rg2_move_threshold_,
-      rg2_still_threshold_, rg3_move_threshold_, rg3_still_threshold_, rg4_move_threshold_, rg4_still_threshold_,
-      rg5_move_threshold_, rg5_still_threshold_, rg6_move_threshold_, rg6_still_threshold_, rg7_move_threshold_,
-      rg7_still_threshold_, rg8_move_threshold_, rg8_still_threshold_;
+  uint8_t light_function_ = 0;
+  uint8_t light_threshold_ = 0;
+  uint8_t out_pin_level_ = 0;
+  uint8_t buffer_pos_ = 0;  // where to resume processing/populating buffer
+  uint8_t buffer_data_[MAX_LINE_LENGTH];
+  uint8_t mac_address_[6] = {0, 0, 0, 0, 0, 0};
+  uint8_t version_[6] = {0, 0, 0, 0, 0, 0};
+  bool bluetooth_on_{false};
+#ifdef USE_NUMBER
+  std::array<number::Number *, TOTAL_GATES> gate_move_threshold_numbers_{};
+  std::array<number::Number *, TOTAL_GATES> gate_still_threshold_numbers_{};
+#endif
+#ifdef USE_SENSOR
+  std::array<SensorWithDedup<uint8_t> *, TOTAL_GATES> gate_move_sensors_{};
+  std::array<SensorWithDedup<uint8_t> *, TOTAL_GATES> gate_still_sensors_{};
+#endif
 };
 
-}  // namespace ld2410
-}  // namespace esphome
+}  // namespace esphome::ld2410

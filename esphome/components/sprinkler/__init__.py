@@ -1,11 +1,9 @@
-import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome import automation
 from esphome.automation import maybe_simple_id
-from esphome.components import number
-from esphome.components import switch
+import esphome.codegen as cg
+from esphome.components import number, switch
+import esphome.config_validation as cv
 from esphome.const import (
-    CONF_ENTITY_CATEGORY,
     CONF_ID,
     CONF_INITIAL_VALUE,
     CONF_MAX_VALUE,
@@ -14,6 +12,7 @@ from esphome.const import (
     CONF_REPEAT,
     CONF_RESTORE_VALUE,
     CONF_RUN_DURATION,
+    CONF_SET_ACTION,
     CONF_STEP,
     CONF_UNIT_OF_MEASUREMENT,
     ENTITY_CATEGORY_CONFIG,
@@ -46,7 +45,6 @@ CONF_QUEUE_ENABLE_SWITCH = "queue_enable_switch"
 CONF_REPEAT_NUMBER = "repeat_number"
 CONF_REVERSE_SWITCH = "reverse_switch"
 CONF_RUN_DURATION_NUMBER = "run_duration_number"
-CONF_SET_ACTION = "set_action"
 CONF_STANDBY_SWITCH = "standby_switch"
 CONF_VALVE_NUMBER = "valve_number"
 CONF_VALVE_OPEN_DELAY = "valve_open_delay"
@@ -132,11 +130,11 @@ def validate_sprinkler(config):
         if (
             CONF_PUMP_SWITCH_OFF_DURING_VALVE_OPEN_DELAY in sprinkler_controller
             and CONF_VALVE_OPEN_DELAY not in sprinkler_controller
+            and sprinkler_controller[CONF_PUMP_SWITCH_OFF_DURING_VALVE_OPEN_DELAY]
         ):
-            if sprinkler_controller[CONF_PUMP_SWITCH_OFF_DURING_VALVE_OPEN_DELAY]:
-                raise cv.Invalid(
-                    f"{CONF_VALVE_OPEN_DELAY} must be defined when {CONF_PUMP_SWITCH_OFF_DURING_VALVE_OPEN_DELAY} is enabled"
-                )
+            raise cv.Invalid(
+                f"{CONF_VALVE_OPEN_DELAY} must be defined when {CONF_PUMP_SWITCH_OFF_DURING_VALVE_OPEN_DELAY} is enabled"
+            )
 
         if (
             CONF_REPEAT in sprinkler_controller
@@ -275,7 +273,7 @@ SPRINKLER_ACTION_SET_RUN_DURATION_SCHEMA = cv.Schema(
 SPRINKLER_ACTION_QUEUE_VALVE_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_ID): cv.use_id(Sprinkler),
-        cv.Optional(CONF_RUN_DURATION, default=0): cv.templatable(
+        cv.Optional(CONF_RUN_DURATION, default="0s"): cv.templatable(
             cv.positive_time_period_seconds
         ),
         cv.Required(CONF_VALVE_NUMBER): cv.templatable(cv.positive_int),
@@ -286,7 +284,9 @@ SPRINKLER_VALVE_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_ENABLE_SWITCH): cv.maybe_simple_value(
             switch.switch_schema(
-                SprinklerControllerSwitch, entity_category=ENTITY_CATEGORY_CONFIG
+                SprinklerControllerSwitch,
+                entity_category=ENTITY_CATEGORY_CONFIG,
+                default_restore_mode="RESTORE_DEFAULT_OFF",
             ),
             key=CONF_NAME,
         ),
@@ -295,12 +295,11 @@ SPRINKLER_VALVE_SCHEMA = cv.Schema(
         cv.Optional(CONF_PUMP_SWITCH_ID): cv.use_id(switch.Switch),
         cv.Optional(CONF_RUN_DURATION): cv.positive_time_period_seconds,
         cv.Optional(CONF_RUN_DURATION_NUMBER): cv.maybe_simple_value(
-            number.NUMBER_SCHEMA.extend(
+            number.number_schema(
+                SprinklerControllerNumber, entity_category=ENTITY_CATEGORY_CONFIG
+            )
+            .extend(
                 {
-                    cv.GenerateID(): cv.declare_id(SprinklerControllerNumber),
-                    cv.Optional(
-                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
-                    ): cv.entity_category,
                     cv.Optional(CONF_INITIAL_VALUE, default=900): cv.positive_int,
                     cv.Optional(CONF_MAX_VALUE, default=86400): cv.positive_int,
                     cv.Optional(CONF_MIN_VALUE, default=1): cv.positive_int,
@@ -313,7 +312,8 @@ SPRINKLER_VALVE_SCHEMA = cv.Schema(
                         CONF_UNIT_OF_MEASUREMENT, default=UNIT_SECOND
                     ): cv.one_of(UNIT_MINUTE, UNIT_SECOND, lower="True"),
                 }
-            ).extend(cv.COMPONENT_SCHEMA),
+            )
+            .extend(cv.COMPONENT_SCHEMA),
             validate_min_max,
             key=CONF_NAME,
         ),
@@ -333,7 +333,9 @@ SPRINKLER_CONTROLLER_SCHEMA = cv.Schema(
         cv.Optional(CONF_NAME): cv.string,
         cv.Optional(CONF_AUTO_ADVANCE_SWITCH): cv.maybe_simple_value(
             switch.switch_schema(
-                SprinklerControllerSwitch, entity_category=ENTITY_CATEGORY_CONFIG
+                SprinklerControllerSwitch,
+                entity_category=ENTITY_CATEGORY_CONFIG,
+                default_restore_mode="RESTORE_DEFAULT_OFF",
             ),
             key=CONF_NAME,
         ),
@@ -343,31 +345,36 @@ SPRINKLER_CONTROLLER_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_QUEUE_ENABLE_SWITCH): cv.maybe_simple_value(
             switch.switch_schema(
-                SprinklerControllerSwitch, entity_category=ENTITY_CATEGORY_CONFIG
+                SprinklerControllerSwitch,
+                entity_category=ENTITY_CATEGORY_CONFIG,
+                default_restore_mode="RESTORE_DEFAULT_OFF",
             ),
             key=CONF_NAME,
         ),
         cv.Optional(CONF_REVERSE_SWITCH): cv.maybe_simple_value(
             switch.switch_schema(
-                SprinklerControllerSwitch, entity_category=ENTITY_CATEGORY_CONFIG
+                SprinklerControllerSwitch,
+                entity_category=ENTITY_CATEGORY_CONFIG,
+                default_restore_mode="RESTORE_DEFAULT_OFF",
             ),
             key=CONF_NAME,
         ),
         cv.Optional(CONF_STANDBY_SWITCH): cv.maybe_simple_value(
             switch.switch_schema(
-                SprinklerControllerSwitch, entity_category=ENTITY_CATEGORY_CONFIG
+                SprinklerControllerSwitch,
+                entity_category=ENTITY_CATEGORY_CONFIG,
+                default_restore_mode="RESTORE_DEFAULT_OFF",
             ),
             key=CONF_NAME,
         ),
         cv.Optional(CONF_NEXT_PREV_IGNORE_DISABLED, default=False): cv.boolean,
         cv.Optional(CONF_MANUAL_SELECTION_DELAY): cv.positive_time_period_seconds,
         cv.Optional(CONF_MULTIPLIER_NUMBER): cv.maybe_simple_value(
-            number.NUMBER_SCHEMA.extend(
+            number.number_schema(
+                SprinklerControllerNumber, entity_category=ENTITY_CATEGORY_CONFIG
+            )
+            .extend(
                 {
-                    cv.GenerateID(): cv.declare_id(SprinklerControllerNumber),
-                    cv.Optional(
-                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
-                    ): cv.entity_category,
                     cv.Optional(CONF_INITIAL_VALUE, default=1): cv.positive_float,
                     cv.Optional(CONF_MAX_VALUE, default=10): cv.positive_float,
                     cv.Optional(CONF_MIN_VALUE, default=0): cv.positive_float,
@@ -377,18 +384,18 @@ SPRINKLER_CONTROLLER_SCHEMA = cv.Schema(
                         single=True
                     ),
                 }
-            ).extend(cv.COMPONENT_SCHEMA),
+            )
+            .extend(cv.COMPONENT_SCHEMA),
             validate_min_max,
             key=CONF_NAME,
         ),
         cv.Optional(CONF_REPEAT): cv.positive_int,
         cv.Optional(CONF_REPEAT_NUMBER): cv.maybe_simple_value(
-            number.NUMBER_SCHEMA.extend(
+            number.number_schema(
+                SprinklerControllerNumber, entity_category=ENTITY_CATEGORY_CONFIG
+            )
+            .extend(
                 {
-                    cv.GenerateID(): cv.declare_id(SprinklerControllerNumber),
-                    cv.Optional(
-                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
-                    ): cv.entity_category,
                     cv.Optional(CONF_INITIAL_VALUE, default=0): cv.positive_int,
                     cv.Optional(CONF_MAX_VALUE, default=10): cv.positive_int,
                     cv.Optional(CONF_MIN_VALUE, default=0): cv.positive_int,
@@ -398,7 +405,8 @@ SPRINKLER_CONTROLLER_SCHEMA = cv.Schema(
                         single=True
                     ),
                 }
-            ).extend(cv.COMPONENT_SCHEMA),
+            )
+            .extend(cv.COMPONENT_SCHEMA),
             validate_min_max,
             key=CONF_NAME,
         ),
@@ -561,18 +569,12 @@ async def sprinkler_simple_action_to_code(config, action_id, template_arg, args)
 
 async def to_code(config):
     for sprinkler_controller in config:
-        var = cg.new_Pvariable(sprinkler_controller[CONF_ID])
-
-        if CONF_NAME in sprinkler_controller:
-            cg.add(var.set_name(sprinkler_controller[CONF_NAME]))
+        if len(sprinkler_controller[CONF_VALVES]) > 1:
+            name = sprinkler_controller[CONF_MAIN_SWITCH][CONF_NAME]
         else:
-            if len(sprinkler_controller[CONF_VALVES]) > 1:
-                name = sprinkler_controller[CONF_MAIN_SWITCH][CONF_NAME]
-            else:
-                name = sprinkler_controller[CONF_VALVES][0][CONF_VALVE_SWITCH][
-                    CONF_NAME
-                ]
-            cg.add(var.set_name(name))
+            name = sprinkler_controller[CONF_VALVES][0][CONF_VALVE_SWITCH][CONF_NAME]
+        name = sprinkler_controller.get(CONF_NAME, name)
+        var = cg.new_Pvariable(sprinkler_controller[CONF_ID], name)
 
         await cg.register_component(var, sprinkler_controller)
 
@@ -589,15 +591,6 @@ async def to_code(config):
             )
             cg.add(var.set_controller_auto_adv_switch(sw_aa_var))
 
-            if CONF_QUEUE_ENABLE_SWITCH in sprinkler_controller:
-                sw_qen_var = await switch.new_switch(
-                    sprinkler_controller[CONF_QUEUE_ENABLE_SWITCH]
-                )
-                await cg.register_component(
-                    sw_qen_var, sprinkler_controller[CONF_QUEUE_ENABLE_SWITCH]
-                )
-                cg.add(var.set_controller_queue_enable_switch(sw_qen_var))
-
             if CONF_REVERSE_SWITCH in sprinkler_controller:
                 sw_rev_var = await switch.new_switch(
                     sprinkler_controller[CONF_REVERSE_SWITCH]
@@ -607,78 +600,83 @@ async def to_code(config):
                 )
                 cg.add(var.set_controller_reverse_switch(sw_rev_var))
 
-            if CONF_STANDBY_SWITCH in sprinkler_controller:
-                sw_stb_var = await switch.new_switch(
-                    sprinkler_controller[CONF_STANDBY_SWITCH]
-                )
-                await cg.register_component(
-                    sw_stb_var, sprinkler_controller[CONF_STANDBY_SWITCH]
-                )
-                cg.add(var.set_controller_standby_switch(sw_stb_var))
+        if CONF_STANDBY_SWITCH in sprinkler_controller:
+            sw_stb_var = await switch.new_switch(
+                sprinkler_controller[CONF_STANDBY_SWITCH]
+            )
+            await cg.register_component(
+                sw_stb_var, sprinkler_controller[CONF_STANDBY_SWITCH]
+            )
+            cg.add(var.set_controller_standby_switch(sw_stb_var))
 
-            if CONF_MULTIPLIER_NUMBER in sprinkler_controller:
-                num_mult_var = await number.new_number(
-                    sprinkler_controller[CONF_MULTIPLIER_NUMBER],
-                    min_value=sprinkler_controller[CONF_MULTIPLIER_NUMBER][
-                        CONF_MIN_VALUE
-                    ],
-                    max_value=sprinkler_controller[CONF_MULTIPLIER_NUMBER][
-                        CONF_MAX_VALUE
-                    ],
-                    step=sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_STEP],
-                )
-                await cg.register_component(
-                    num_mult_var, sprinkler_controller[CONF_MULTIPLIER_NUMBER]
-                )
-                cg.add(
-                    num_mult_var.set_initial_value(
-                        sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_INITIAL_VALUE]
-                    )
-                )
-                cg.add(
-                    num_mult_var.set_restore_value(
-                        sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_RESTORE_VALUE]
-                    )
-                )
+        if CONF_QUEUE_ENABLE_SWITCH in sprinkler_controller:
+            sw_qen_var = await switch.new_switch(
+                sprinkler_controller[CONF_QUEUE_ENABLE_SWITCH]
+            )
+            await cg.register_component(
+                sw_qen_var, sprinkler_controller[CONF_QUEUE_ENABLE_SWITCH]
+            )
+            cg.add(var.set_controller_queue_enable_switch(sw_qen_var))
 
-                if CONF_SET_ACTION in sprinkler_controller[CONF_MULTIPLIER_NUMBER]:
-                    await automation.build_automation(
-                        num_mult_var.get_set_trigger(),
-                        [(float, "x")],
-                        sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_SET_ACTION],
-                    )
+        if CONF_MULTIPLIER_NUMBER in sprinkler_controller:
+            num_mult_var = await number.new_number(
+                sprinkler_controller[CONF_MULTIPLIER_NUMBER],
+                min_value=sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_MIN_VALUE],
+                max_value=sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_MAX_VALUE],
+                step=sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_STEP],
+            )
+            await cg.register_component(
+                num_mult_var, sprinkler_controller[CONF_MULTIPLIER_NUMBER]
+            )
+            cg.add(
+                num_mult_var.set_initial_value(
+                    sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_INITIAL_VALUE]
+                )
+            )
+            cg.add(
+                num_mult_var.set_restore_value(
+                    sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_RESTORE_VALUE]
+                )
+            )
 
-                cg.add(var.set_controller_multiplier_number(num_mult_var))
-
-            if CONF_REPEAT_NUMBER in sprinkler_controller:
-                num_repeat_var = await number.new_number(
-                    sprinkler_controller[CONF_REPEAT_NUMBER],
-                    min_value=sprinkler_controller[CONF_REPEAT_NUMBER][CONF_MIN_VALUE],
-                    max_value=sprinkler_controller[CONF_REPEAT_NUMBER][CONF_MAX_VALUE],
-                    step=sprinkler_controller[CONF_REPEAT_NUMBER][CONF_STEP],
-                )
-                await cg.register_component(
-                    num_repeat_var, sprinkler_controller[CONF_REPEAT_NUMBER]
-                )
-                cg.add(
-                    num_repeat_var.set_initial_value(
-                        sprinkler_controller[CONF_REPEAT_NUMBER][CONF_INITIAL_VALUE]
-                    )
-                )
-                cg.add(
-                    num_repeat_var.set_restore_value(
-                        sprinkler_controller[CONF_REPEAT_NUMBER][CONF_RESTORE_VALUE]
-                    )
+            if CONF_SET_ACTION in sprinkler_controller[CONF_MULTIPLIER_NUMBER]:
+                await automation.build_automation(
+                    num_mult_var.get_set_trigger(),
+                    [(float, "x")],
+                    sprinkler_controller[CONF_MULTIPLIER_NUMBER][CONF_SET_ACTION],
                 )
 
-                if CONF_SET_ACTION in sprinkler_controller[CONF_REPEAT_NUMBER]:
-                    await automation.build_automation(
-                        num_repeat_var.get_set_trigger(),
-                        [(float, "x")],
-                        sprinkler_controller[CONF_REPEAT_NUMBER][CONF_SET_ACTION],
-                    )
+            cg.add(var.set_controller_multiplier_number(num_mult_var))
 
-                cg.add(var.set_controller_repeat_number(num_repeat_var))
+        if CONF_REPEAT_NUMBER in sprinkler_controller:
+            num_repeat_var = await number.new_number(
+                sprinkler_controller[CONF_REPEAT_NUMBER],
+                min_value=sprinkler_controller[CONF_REPEAT_NUMBER][CONF_MIN_VALUE],
+                max_value=sprinkler_controller[CONF_REPEAT_NUMBER][CONF_MAX_VALUE],
+                step=sprinkler_controller[CONF_REPEAT_NUMBER][CONF_STEP],
+            )
+            await cg.register_component(
+                num_repeat_var, sprinkler_controller[CONF_REPEAT_NUMBER]
+            )
+            cg.add(
+                num_repeat_var.set_initial_value(
+                    sprinkler_controller[CONF_REPEAT_NUMBER][CONF_INITIAL_VALUE]
+                )
+            )
+            cg.add(
+                num_repeat_var.set_restore_value(
+                    sprinkler_controller[CONF_REPEAT_NUMBER][CONF_RESTORE_VALUE]
+                )
+            )
+
+            if CONF_SET_ACTION in sprinkler_controller[CONF_REPEAT_NUMBER]:
+                await automation.build_automation(
+                    num_repeat_var.get_set_trigger(),
+                    [(float, "x")],
+                    sprinkler_controller[CONF_REPEAT_NUMBER][CONF_SET_ACTION],
+                )
+
+            cg.add(var.set_controller_repeat_number(num_repeat_var))
 
         for valve in sprinkler_controller[CONF_VALVES]:
             sw_valve_var = await switch.new_switch(valve[CONF_VALVE_SWITCH])

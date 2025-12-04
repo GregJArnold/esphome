@@ -1,6 +1,6 @@
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import uart
+import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
 CODEOWNERS = ["@ssieb"]
@@ -15,6 +15,7 @@ VBus = vbus_ns.class_("VBus", uart.UARTDevice, cg.Component)
 CONF_VBUS_ID = "vbus_id"
 
 CONF_DELTASOL_BS_PLUS = "deltasol_bs_plus"
+CONF_DELTASOL_BS_2009 = "deltasol_bs_2009"
 CONF_DELTASOL_C = "deltasol_c"
 CONF_DELTASOL_CS2 = "deltasol_cs2"
 CONF_DELTASOL_CS_PLUS = "deltasol_cs_plus"

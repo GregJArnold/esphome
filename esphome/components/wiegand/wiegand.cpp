@@ -1,6 +1,6 @@
 #include "wiegand.h"
-#include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
+#include "esphome/core/log.h"
 
 namespace esphome {
 namespace wiegand {
@@ -11,7 +11,7 @@ static const char *const KEYS = "0123456789*#";
 void IRAM_ATTR HOT WiegandStore::d0_gpio_intr(WiegandStore *arg) {
   if (arg->d0.digital_read())
     return;
-  arg->count++;
+  arg->count++;  // NOLINT(clang-diagnostic-deprecated-volatile)
   arg->value <<= 1;
   arg->last_bit_time = millis();
   arg->done = false;
@@ -20,7 +20,7 @@ void IRAM_ATTR HOT WiegandStore::d0_gpio_intr(WiegandStore *arg) {
 void IRAM_ATTR HOT WiegandStore::d1_gpio_intr(WiegandStore *arg) {
   if (arg->d1.digital_read())
     return;
-  arg->count++;
+  arg->count++;  // NOLINT(clang-diagnostic-deprecated-volatile)
   arg->value = (arg->value << 1) | 1;
   arg->last_bit_time = millis();
   arg->done = false;
@@ -101,6 +101,16 @@ void Wiegand::loop() {
     if (value < 12) {
       uint8_t key = KEYS[value];
       this->send_key_(key);
+    }
+  } else if (count == 8) {
+    if ((value ^ 0xf0) >> 4 == (value & 0xf)) {
+      value &= 0xf;
+      for (auto *trigger : this->key_triggers_)
+        trigger->trigger(value);
+      if (value < 12) {
+        uint8_t key = KEYS[value];
+        this->send_key_(key);
+      }
     }
   } else {
     ESP_LOGD(TAG, "received unknown %d-bit value: %llx", count, value);

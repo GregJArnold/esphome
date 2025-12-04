@@ -10,7 +10,6 @@ namespace pcf85063 {
 static const char *const TAG = "pcf85063";
 
 void PCF85063Component::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up PCF85063...");
   if (!this->read_rtc_()) {
     this->mark_failed();
   }
@@ -22,9 +21,9 @@ void PCF85063Component::dump_config() {
   ESP_LOGCONFIG(TAG, "PCF85063:");
   LOG_I2C_DEVICE(this);
   if (this->is_failed()) {
-    ESP_LOGE(TAG, "Communication with PCF85063 failed!");
+    ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
   }
-  ESP_LOGCONFIG(TAG, "  Timezone: '%s'", this->timezone_.c_str());
+  RealTimeClock::dump_config();
 }
 
 float PCF85063Component::get_setup_priority() const { return setup_priority::DATA; }
@@ -37,7 +36,7 @@ void PCF85063Component::read_time() {
     ESP_LOGW(TAG, "RTC halted, not syncing to system clock.");
     return;
   }
-  time::ESPTime rtc_time{
+  ESPTime rtc_time{
       .second = uint8_t(pcf85063_.reg.second + 10 * pcf85063_.reg.second_10),
       .minute = uint8_t(pcf85063_.reg.minute + 10u * pcf85063_.reg.minute_10),
       .hour = uint8_t(pcf85063_.reg.hour + 10u * pcf85063_.reg.hour_10),

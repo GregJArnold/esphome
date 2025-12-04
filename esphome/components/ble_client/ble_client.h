@@ -15,8 +15,7 @@
 #include <string>
 #include <vector>
 
-namespace esphome {
-namespace ble_client {
+namespace esphome::ble_client {
 
 namespace espbt = esphome::esp32_ble_tracker;
 
@@ -27,7 +26,7 @@ class BLEClient;
 class BLEClientNode {
  public:
   virtual void gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
-                                   esp_ble_gattc_cb_param_t *param) = 0;
+                                   esp_ble_gattc_cb_param_t *param){};
   virtual void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {}
   virtual void loop() {}
   void set_address(uint64_t address) { address_ = address; }
@@ -75,7 +74,6 @@ class BLEClient : public BLEClientBase {
   std::vector<BLEClientNode *> nodes_;
 };
 
-}  // namespace ble_client
-}  // namespace esphome
+}  // namespace esphome::ble_client
 
 #endif

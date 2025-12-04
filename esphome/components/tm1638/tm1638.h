@@ -1,15 +1,13 @@
 #pragma once
 
+#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
-#include "esphome/core/automation.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/time.h"
+#include "esphome/components/display/display.h"
 
 #include <vector>
-
-#ifdef USE_TIME
-#include "esphome/components/time/real_time_clock.h"
-#endif
 
 namespace esphome {
 namespace tm1638 {
@@ -21,7 +19,7 @@ class KeyListener {
 
 class TM1638Component;
 
-using tm1638_writer_t = std::function<void(TM1638Component &)>;
+using tm1638_writer_t = display::DisplayWriter<TM1638Component>;
 
 class TM1638Component : public PollingComponent {
  public:
@@ -52,12 +50,10 @@ class TM1638Component : public PollingComponent {
   void loop() override;
   uint8_t get_keys();
 
-#ifdef USE_TIME
   /// Evaluate the strftime-format and print the result at the given position.
-  uint8_t strftime(uint8_t pos, const char *format, time::ESPTime time) __attribute__((format(strftime, 3, 0)));
+  uint8_t strftime(uint8_t pos, const char *format, ESPTime time) __attribute__((format(strftime, 3, 0)));
   /// Evaluate the strftime-format and print the result at position 0.
-  uint8_t strftime(const char *format, time::ESPTime time) __attribute__((format(strftime, 2, 0)));
-#endif
+  uint8_t strftime(const char *format, ESPTime time) __attribute__((format(strftime, 2, 0)));
 
   void set_led(int led_pos, bool led_on_off);
 
@@ -75,7 +71,7 @@ class TM1638Component : public PollingComponent {
   GPIOPin *stb_pin_;
   GPIOPin *dio_pin_;
   uint8_t *buffer_ = new uint8_t[8];
-  optional<tm1638_writer_t> writer_{};
+  tm1638_writer_t writer_{};
   std::vector<KeyListener *> listeners_{};
 };
 

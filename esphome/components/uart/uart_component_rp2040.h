@@ -11,8 +11,7 @@
 #include "esphome/core/log.h"
 #include "uart_component.h"
 
-namespace esphome {
-namespace uart {
+namespace esphome::uart {
 
 class RP2040UartComponent : public UARTComponent, public Component {
  public:
@@ -30,6 +29,9 @@ class RP2040UartComponent : public UARTComponent, public Component {
 
   uint16_t get_config();
 
+  bool is_hw_serial() { return this->hw_serial_; }
+  HardwareSerial *get_hw_serial() { return this->serial_; }
+
  protected:
   void check_logger_conflict() override {}
   bool hw_serial_{false};
@@ -37,7 +39,5 @@ class RP2040UartComponent : public UARTComponent, public Component {
   HardwareSerial *serial_{nullptr};
 };
 
-}  // namespace uart
-}  // namespace esphome
-
+}  // namespace esphome::uart
 #endif  // USE_RP2040
